@@ -6,3 +6,5 @@ numpy
 yfinance
 nltk
 supabase
+scikit-learn
+scipy
