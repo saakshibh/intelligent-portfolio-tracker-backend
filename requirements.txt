@@ -8,3 +8,4 @@ nltk
 supabase
 scikit-learn
 scipy
+tensorflow
