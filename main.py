@@ -3,6 +3,8 @@ import os
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fastapi import HTTPException
+import logging
 
 # Ensures the script can find final_sync.py in the same directory
 sys.path.append(os.path.dirname(__file__))
@@ -28,17 +30,28 @@ async def root():
 
 @app.post("/analyze")
 async def start_analysis(request: StockRequest, background_tasks: BackgroundTasks):
-    # Clean ticker before passing to background task
-    ticker = request.ticker.split()[-1].strip().upper()
-    
-    # We use background_tasks so the API returns a response immediately
-    background_tasks.add_task(analyze_and_sync, [ticker])
-    
-    return {
-        "status": "Analysis started", 
-        "ticker": ticker,
-        "message": "AI training started. Dashboard will update automatically in 1-2 minutes."
-    }
+    try:
+        # 1. Fallback validation if ticker is blank
+        if not request.ticker or not request.ticker.strip():
+            raise HTTPException(status_code=400, detail="Ticker cannot be empty")
+            
+        # 2. Extract and format ticker safely
+        ticker = request.ticker.strip().split()[-1].upper()
+        logging.info(f"Received sync request targeting ticker token: {ticker}")
+        
+        # 3. Queue the background machine learning pipeline task
+        background_tasks.add_task(analyze_and_sync, [ticker])
+        
+        return {
+            "status": "Analysis started", 
+            "ticker": ticker,
+            "message": "AI training started. Dashboard will update automatically."
+        }
+        
+    except Exception as e:
+        logging.error(f"Internal Pipeline Error: {str(e)}")
+        # Returning an explicit HTTP error keeps your CORS headers completely intact!
+        raise HTTPException(status_code=500, detail=f"Backend execution dropped: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn
